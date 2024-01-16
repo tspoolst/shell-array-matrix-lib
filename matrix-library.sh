@@ -267,7 +267,7 @@ else
     ###Using the "sort" command for anything over 100 entries.  :-/
     if [ $(asize - $2) -gt 100 ] ; then
       #this shell call is not quoted.  the newlines should be stripped from output, but it's not.  :-/
-      _i=$( for i in ${_i% };do echo ${i};done | sort -n | (while read i;do echo -n "${i} ";done) )
+      _i=$( for _j in ${_i% };do echo ${_j};done | sort -n | (while read _j;do echo -n "${_j} ";done) )
     else
       _i=$(
         lc_akeys_doSwap=false
@@ -326,7 +326,7 @@ else
         eval "$1=\"\${${_n}_${_i}}\""
       fi
     else
-      _i=$(for i in $(akeys - $2);do echo -n "$(aget - $2[${i}]) ";done)
+      _i=$(for _i in $(akeys - $2);do echo -n "$(aget - $2[${_i}]) ";done)
       if [ "$1" = "-" ] ; then
         eval "echo \"\${_i% }\""
       else
