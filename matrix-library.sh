@@ -261,13 +261,58 @@ else
 #[of]:    akeys() {
   akeys() {
     local _i
-    eval "_i=\$(set | while read -r _i;do [ -z \"\${_i##${2}_*}\" ] && _i=\"\${_i%%=*}\" && echo -n  \"\${_i##*_} \";done)"
+    eval "_i=\$(set | while read -r _i;do [ -z \"\${_i##${2}_*}\" ] && _i=\"\${_i%%=*}\" && echo -n \"\${_i##*_} \";done)"
+
+    ###I tried doing the array lib 100% in dash.  though this sorting algorithm works, it still sucks cuz it's slow.
+    ###Using the "sort" command for anything over 100 entries.  :-/
+    if [ $(asize - $2) -gt 100 ] ; then
+      #this shell call is not quoted.  the newlines should be stripped from output, but it's not.  :-/
+      _i=$( for i in ${_i% };do echo ${i};done | sort -n | (while read i;do echo -n "${i} ";done) )
+    else
+      _i=$(
+        lc_akeys_doSwap=false
+        lc_akeys_size=$(asize - $2)
+        set -- ${_i% }
+        while [ ${lc_akeys_size} -gt 1 ] ; do
+          lc_akeys_index=1
+          lc_akeys_tmp=""
+          lc_akeys_didSwap=false
+          while [ ${lc_akeys_index} -lt ${lc_akeys_size} ] ; do
+            ! ${lc_akeys_doSwap} && eval "lc_akeys_vara=\${${lc_akeys_index}}"
+            eval "lc_akeys_varb=\${$((lc_akeys_index+1))}"
+            if [ "${lc_akeys_vara}" -gt "${lc_akeys_varb}" ] ; then
+              lc_akeys_tmp="${lc_akeys_tmp}${lc_akeys_varb} "
+              lc_akeys_doSwap=true
+              lc_akeys_didSwap=true
+            else
+              lc_akeys_tmp="${lc_akeys_tmp}${lc_akeys_vara} "
+              lc_akeys_doSwap=false
+            fi
+            shift $((${lc_akeys_index}))
+            if ${lc_akeys_doSwap} && [ ${lc_akeys_index} -eq $((lc_akeys_size-1)) ] ; then
+              shift
+              set -- ${lc_akeys_tmp}${lc_akeys_vara} $@
+              lc_akeys_doSwap=false
+            else
+              set -- ${lc_akeys_tmp}$@
+            fi
+            : $((lc_akeys_index=lc_akeys_index+1))
+          done
+          : $((lc_akeys_size=lc_akeys_size-1))
+          ${lc_akeys_didSwap} || break
+        done
+        echo $@
+      )
+    fi
+
     if [ "$1" = "-" ] ; then
       eval "echo \"${_i% }\""
     else
       eval "$1=\"\${_i% }\""
     fi
   }
+#[c]
+#[c]
 #[cf]
 #[of]:    aget() {
   aget() {
@@ -281,7 +326,7 @@ else
         eval "$1=\"\${${_n}_${_i}}\""
       fi
     else
-      eval "_i=\$(set | while read -r _i;do [ -z \"\${_i##${2}_*}\" ] && echo -n \"\${_i#*=} \";done)"
+      _i=$(for i in $(akeys - $2);do echo -n "$(aget - $2[${i}]) ";done)
       if [ "$1" = "-" ] ; then
         eval "echo \"\${_i% }\""
       else
