@@ -85,6 +85,8 @@ done
 asize - a
 akeys - a
 aget - a
+
+
 #[cf]
 
   exit
@@ -185,5 +187,13 @@ matrixTest() {
 
 #[c]arrayTest
 #[c]matrixTest
+
+i=0
+while [ $i -lt 100 ] ; do
+  aset a[${i}] v$i
+  : $((i=i+1))
+done
+
+akeys - a
 
 

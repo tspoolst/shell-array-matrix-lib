@@ -263,47 +263,7 @@ else
     local _i
     eval "_i=\$(set | while read -r _i;do [ -z \"\${_i##${2}_*}\" ] && _i=\"\${_i%%=*}\" && echo -n \"\${_i##*_} \";done)"
 
-    ###I tried doing the array lib 100% in dash.  though this sorting algorithm works, it still sucks cuz it's slow.
-    ###Using the "sort" command for anything over 100 entries.  :-/
-    if [ $(asize - $2) -gt 100 ] ; then
-      #this shell call is not quoted.  the newlines should be stripped from output, but it's not.  :-/
-      _i=$( for _j in ${_i% };do echo ${_j};done | sort -n | (while read _j;do echo -n "${_j} ";done) )
-    else
-      _i=$(
-        lc_akeys_doSwap=false
-        lc_akeys_size=$(asize - $2)
-        set -- ${_i% }
-        while [ ${lc_akeys_size} -gt 1 ] ; do
-          lc_akeys_index=1
-          lc_akeys_tmp=""
-          lc_akeys_didSwap=false
-          while [ ${lc_akeys_index} -lt ${lc_akeys_size} ] ; do
-            ! ${lc_akeys_doSwap} && eval "lc_akeys_vara=\${${lc_akeys_index}}"
-            eval "lc_akeys_varb=\${$((lc_akeys_index+1))}"
-            if [ "${lc_akeys_vara}" -gt "${lc_akeys_varb}" ] ; then
-              lc_akeys_tmp="${lc_akeys_tmp}${lc_akeys_varb} "
-              lc_akeys_doSwap=true
-              lc_akeys_didSwap=true
-            else
-              lc_akeys_tmp="${lc_akeys_tmp}${lc_akeys_vara} "
-              lc_akeys_doSwap=false
-            fi
-            shift $((${lc_akeys_index}))
-            if ${lc_akeys_doSwap} && [ ${lc_akeys_index} -eq $((lc_akeys_size-1)) ] ; then
-              shift
-              set -- ${lc_akeys_tmp}${lc_akeys_vara} $@
-              lc_akeys_doSwap=false
-            else
-              set -- ${lc_akeys_tmp}$@
-            fi
-            : $((lc_akeys_index=lc_akeys_index+1))
-          done
-          : $((lc_akeys_size=lc_akeys_size-1))
-          ${lc_akeys_didSwap} || break
-        done
-        echo $@
-      )
-    fi
+    _i=$(ansort - ${_i})
 
     if [ "$1" = "-" ] ; then
       eval "echo \"${_i% }\""
@@ -334,6 +294,132 @@ else
       fi
     fi
   }
+#[cf]
+#[of]:    ansort() {
+ansort() {
+#[of]:  usage
+  if [ $# -lt 2 ] ; then
+    echo "Usage: asort {-|array} [val val val ...]"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  sorts an array"
+    echo "Examples:"
+    echo '  i.e.  asort a "${a[@]}"'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  local lc_asort_var lc_asort_input lc_asort_tmp lc_asort_output
+  local lc_asort_val1 lc_asort_val2
+  local lc_asort_didSwap
+
+  lc_asort_var="$1"
+  shift
+  lc_asort_input="$@"
+  
+  ###I tried doing the array lib 100% in dash.  though this sorting algorithm works, it still sucks cuz it's slow.
+  ###Using the "sort" command for anything over 100 entries.  :-/
+  if [ $# -gt 100 ] ; then
+    #this shell call is not quoted.  the newlines should be stripped from output, but it's not.  :-/
+    lc_asort_output=$( for _i in ${lc_asort_input};do echo ${_i};done | sort -n | (while read _i;do echo -n "${_i} ";done) )
+  else
+    lc_asort_didSwap=true
+    while ${lc_asort_didSwap} && [ -n "${lc_asort_input}" ] ; do
+      lc_asort_didSwap=false
+      if [ -z "${lc_asort_input##* *}" ] ; then
+        lc_asort_val1="${lc_asort_input%% *}"
+        lc_asort_input="${lc_asort_input#* }"
+      else
+        lc_asort_val1="${lc_asort_input}"
+        lc_asort_input=""
+      fi
+      while [ -n "${lc_asort_input}" ] ; do
+        if [ -z "${lc_asort_input##* *}" ] ; then
+          lc_asort_val2="${lc_asort_input%% *}"
+          lc_asort_input="${lc_asort_input#* }"
+        else
+          lc_asort_val2="${lc_asort_input}"
+          lc_asort_input=""
+        fi
+        if [ ${lc_asort_val1} -lt ${lc_asort_val2} ] ; then
+          lc_asort_tmp="${lc_asort_tmp}${lc_asort_val1} "
+          lc_asort_val1="${lc_asort_val2}"
+        else
+          lc_asort_tmp="${lc_asort_tmp}${lc_asort_val2} "
+          lc_asort_didSwap=true
+        fi
+      done
+      if ${lc_asort_didSwap} ; then
+        lc_asort_input="${lc_asort_tmp% }"
+        lc_asort_tmp=""
+        lc_asort_output="${lc_asort_val1}${lc_asort_output:+ }${lc_asort_output}"
+      else
+        lc_asort_tmp="${lc_asort_tmp% }"
+        lc_asort_output="${lc_asort_tmp}${lc_asort_tmp:+ }${lc_asort_val1}${lc_asort_output:+ }${lc_asort_output}"
+      fi
+    done
+  fi
+  if [ "${lc_asort_var}" = "-" ] ; then
+    eval "echo \"${lc_asort_output}\""
+  else
+    eval "${lc_asort_var}=\"\${lc_asort_output}\""
+  fi
+}
+#[cf]
+#[of]:    ansort2() {
+ansort2() {
+  ###first try at bubble sort in dash
+  ###about 10x slower than the current asort
+  local lc_asort_var lc_asort_input lc_asort_tmp lc_asort_output
+  local lc_asort_val1 lc_asort_val2
+  local lc_asort_didSwap
+
+  lc_asort_var="$1"
+  shift
+  lc_asort_input="$@"
+   
+  lc_asort_output=$(
+    lc_akeys_doSwap=false
+    lc_akeys_size=$#
+    set -- ${lc_asort_input}
+    while [ ${lc_akeys_size} -gt 1 ] ; do
+      lc_akeys_index=1
+      lc_akeys_tmp=""
+      lc_akeys_didSwap=false
+      while [ ${lc_akeys_index} -lt ${lc_akeys_size} ] ; do
+        ! ${lc_akeys_doSwap} && eval "lc_akeys_vara=\${${lc_akeys_index}}"
+        eval "lc_akeys_varb=\${$((lc_akeys_index+1))}"
+        if [ "${lc_akeys_vara}" -gt "${lc_akeys_varb}" ] ; then
+          lc_akeys_tmp="${lc_akeys_tmp}${lc_akeys_varb} "
+          lc_akeys_doSwap=true
+          lc_akeys_didSwap=true
+        else
+          lc_akeys_tmp="${lc_akeys_tmp}${lc_akeys_vara} "
+          lc_akeys_doSwap=false
+        fi
+        shift $((${lc_akeys_index}))
+        if ${lc_akeys_doSwap} && [ ${lc_akeys_index} -eq $((lc_akeys_size-1)) ] ; then
+          shift
+          set -- ${lc_akeys_tmp}${lc_akeys_vara} $@
+          lc_akeys_doSwap=false
+        else
+          set -- ${lc_akeys_tmp}$@
+        fi
+        : $((lc_akeys_index=lc_akeys_index+1))
+      done
+      : $((lc_akeys_size=lc_akeys_size-1))
+      ${lc_akeys_didSwap} || break
+    done
+    echo $@
+  )
+
+  if [ "${lc_asort_var}" = "-" ] ; then
+    eval "echo \"${lc_asort_output}\""
+  else
+    eval "${lc_asort_var}=\"\${lc_asort_output}\""
+  fi
+}
 #[cf]
 #[of]:    isarray() {
   isarray() {
