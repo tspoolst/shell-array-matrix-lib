@@ -51,24 +51,6 @@ isset() {
 #[cf]
 #[cf]
 #[of]:array
-#[of]:asize() {
-  asize() {
-    if [[ "$1" = "-" ]] ; then
-      eval "echo \${#${2}[@]}"
-    else
-      eval "$1=\"\${#${2}[@]}\""
-    fi
-  }
-#[cf]
-#[of]:akeys() {
-  akeys() {
-    if [[ "$1" = "-" ]] ; then
-      eval "echo \"\${!${2}[@]}\""
-    else
-      eval "$1=\"\${!${2}[@]}\""
-    fi
-  }
-#[cf]
 #[of]:aget() {
   aget() {
     local _i
@@ -87,6 +69,24 @@ isset() {
       else
         eval "$1=\"\${_i% }\""
       fi
+    fi
+  }
+#[cf]
+#[of]:asize() {
+  asize() {
+    if [[ "$1" = "-" ]] ; then
+      eval "echo \${#${2}[@]}"
+    else
+      eval "$1=\"\${#${2}[@]}\""
+    fi
+  }
+#[cf]
+#[of]:akeys() {
+  akeys() {
+    if [[ "$1" = "-" ]] ; then
+      eval "echo \"\${!${2}[@]}\""
+    else
+      eval "$1=\"\${!${2}[@]}\""
     fi
   }
 #[cf]
@@ -155,7 +155,361 @@ isset() {
   }
 #[cf]
 
-#[c]
+
+#[of]:ansort() {
+ansort() {
+#[of]:  usage
+  if [[ $# -lt 2 ]] ; then
+    echo "Usage: asort {-|array} [val val val ...]"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  sorts an array"
+    echo "Examples:"
+    echo '  i.e.  asort a "${a[@]}"'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  typeset lc_asort_tmp lc_asort_size lc_asort_index
+  unset lc_asort_array
+#[of]:  array bubble sort
+  aset lc_asort_array "$@"
+  ashift ! lc_asort_array
+  lc_asort_size=${#lc_asort_array[@]}
+  ((lc_asort_size-=1))
+  while [[ ${lc_asort_size} -gt 0 ]] ; do
+    lc_asort_index=0    
+    while [[ ${lc_asort_index} -lt ${lc_asort_size} ]] ; do
+      if [[ "${lc_asort_array[${lc_asort_index}]}" > "${lc_asort_array[$((lc_asort_index+1))]}" ]] ; then
+        lc_asort_tmp="${lc_asort_array[$((lc_asort_index+1))]}"
+        lc_asort_array[$((lc_asort_index+1))]="${lc_asort_array[${lc_asort_index}]}"
+        lc_asort_array[${lc_asort_index}]="${lc_asort_tmp}"
+      fi
+      ((lc_asort_index+=1))
+    done
+    ((lc_asort_size-=1))
+  done
+#[cf]
+  if [[ "$1" = "-" ]] ; then
+    echo "${lc_asort_array[@]}"
+  else
+    eval "aset $1 \"\${lc_asort_array[@]}\""
+  fi
+  unset lc_asort_array
+  return 0
+}
+#[cf]
+
+#[of]:asplit() {
+asplit() {
+#[of]:  usage
+  if [ $# -lt 2 ] ; then
+    echo "Usage: asplit {array} {delimiter} [string]"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  splits a string into an array list"
+    echo "  this emulates the perl function join"
+    echo "Examples:"
+    echo '  i.e.  asplit b : "part1:part2:part3:part4"'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  local _esc
+  if [ "$1" = "-e" ] ; then
+    _esc=true
+    shift
+  fi
+#[of]:  if [ -z "$2" ] ; then
+  if [ -z "$2" ] ; then
+    eval "
+      shift;shift
+      local _string=\"\$*\"
+      local _aindex
+      _aindex=0
+
+      if isnum \"$1\" ; then
+        while [ \${#_string} -gt 0 ] ; do
+          [ \"$1\" -eq \"\${_aindex}\" ] && {
+            echo \"\${_string%\"\${_string#?}\"}\"
+            break
+          }
+          _string=\"\${_string#?}\"
+          : \$((_aindex=_aindex+1))
+        done
+      else
+        while [ \${#_string} -gt 0 ] ; do
+          aset $1[\${_aindex}] \"\${_string%\"\${_string#?}\"}\"
+          _string=\"\${_string#?}\"
+          : \$((_aindex=_aindex+1))
+        done
+      fi
+    "
+#[cf]
+#[of]:  elif ${_esc\:-false} ; then
+  elif ${_esc:-false} ; then
+    eval "
+      shift;shift
+      local _char
+      local _lit=false
+      local _index=0
+      local _string=\"\$*\"
+
+      if isnum \"$1\" ; then
+        while [ \${#_string} -gt 0 ] ; do
+          _char=\"\${_string%\"\${_string#?}\"}\"
+          _string=\"\${_string#?}\"
+          if [ \"\${_char}\" = \"\\\\\" ] ; then
+            _lit=true
+            continue
+          elif ! \${_lit} && [ \"\${_char}\" = \"$2\" ] ; then
+            [ \"$1\" -eq \"\${_index}\" ] && {
+              echo \"\${_entry}\"
+              break
+            }
+            unset _entry
+            : \$((_index=_index+1))
+            continue
+          fi
+          _lit=false
+          local _entry=\"\${_entry}\${_char}\"
+        done
+        [ \"$1\" -eq \"\${_index}\" ] && {
+          echo \"\${_entry}\"
+        }
+      else
+        while [ \${#_string} -gt 0 ] ; do
+          _char=\"\${_string%\"\${_string#?}\"}\"
+          _string=\"\${_string#?}\"
+          if [ \"\${_char}\" = \"\\\\\" ] ; then
+            _lit=true
+            continue
+          elif ! \${_lit} && [ \"\${_char}\" = \"$2\" ] ; then
+            aset $1[\${_index}] \"\${_entry}\"
+            unset _entry
+            : \$((_index=_index+1))
+            continue
+          fi
+          _lit=false
+          local _entry=\"\${_entry}\${_char}\"
+        done
+        aset $1[\${_index}] \"\${_entry}\"
+      fi
+    "
+#[cf]
+#[of]:  else
+  else
+    eval "
+      shift;shift
+      local IFS=\"$2\"
+      local _string=\"\$*\"
+      if isnum \"$1\" ; then
+        set -- \$@
+        eval \"echo \\\"\\\$\$(($1 +1))\\\" \"
+      else
+        if [ \"\${_string%$2}\" = \"\$*\" ] ; then
+          aset $1 \$@
+        else
+          aset $1 \$@ \"\"
+        fi
+      fi
+    "
+#[cf]
+  fi
+}
+##if first arg is a number it is a zero based position in the string
+##ugh.  yet another lovely backslash forrest.
+#[cf]
+#[of]:ajoin() {
+ajoin() {
+#[of]:  usage
+  if [ $# -lt 2 ] ; then
+    echo "Usage: ajoin {-|var} {delimiter} [val val val ...]"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  joins a list into a single string"
+    echo "  this emulates the perl function join"
+    echo "Examples:"
+    echo '  i.e.  ajoin a : "${a[@]}"'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  eval "
+    shift;shift
+    local IFS=\"$2\"
+    if [ \"$1\" = \"-\" ] ; then
+      echo \"\$*\"
+    else
+      $1=\"\$*\"
+    fi
+  "
+}
+#[cf]
+
+#[of]:apush() {
+apush() {
+#[of]:  usage
+  if [[ $# -eq 0 ]] ; then
+    echo "Usage: apush {array} [val val val ...]"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  adds new element/s to the end of an array"
+    echo "  this emulates the perl function unshift"
+    echo "Examples:"
+    echo '  i.e.  apush b "a string"'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  eval "
+    shift
+    aset $1 \"\${$1[@]}\" \"\$@\"
+  "
+}
+#[cf]
+#[of]:apop() {
+apop() {
+#[of]:  usage
+  if [[ $# -ne 2 ]] ; then
+    echo "Usage: apop {!|-|var} {array}"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  shift an array 1 element right and return that element in var"
+    echo "  this emulates the perl function shift"
+    echo "Examples:"
+    echo '  i.e.  apop b a'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  eval "
+    if [[ \${#$2[@]} -gt 0 ]] ; then
+      if [[ \"$1\" = \"!\" ]] ; then
+        :
+      elif [[ \"$1\" = \"-\" ]] ; then
+        echo \"\${$2[\$((\${#$2[@]} -1))]}\"
+      else
+        $1=\"\${$2[\$((\${#$2[@]} -1))]}\"
+      fi
+      unset $2[\$((\${#$2[@]} -1))]
+    else
+      return 1
+    fi
+  "
+  return 0
+}
+#[cf]
+
+#[of]:aunshift() {
+aunshift() {
+#[of]:  usage
+  if [[ $# -eq 0 ]] ; then
+    echo "Usage: aunshift {array} [val val val ...]"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  adds new element/s to the beginning of an array"
+    echo "  this emulates the perl function unshift"
+    echo "Examples:"
+    echo '  i.e.  aunshift b "a string"'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  eval "
+    shift
+    aset $1 \"\$@\" \"\${$1[@]}\"
+  "
+}
+#[cf]
+#[of]:ashift() {
+ashift() {
+#[of]:  usage
+  if [[ $# -ne 2 ]] ; then
+    echo "Usage: ashift {!|-|var} {array}"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  shift an array 1 element left and return that element in var"
+    echo "  this emulates the perl function shift"
+    echo "Examples:"
+    echo '  i.e.  ashift b a'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  eval "
+    if [[ \${#$2} -gt 0 ]] ; then
+      if [[ \"$1\" = \"!\" ]] ; then
+        :
+      elif [[ \"$1\" = \"-\" ]] ; then
+        echo \"\${$2[0]}\"
+      else
+        $1=\"\${$2[0]}\"
+      fi
+      unset $2[0]
+      aset $2 \"\${$2[@]}\"
+    else
+      return 1
+    fi
+  "
+  return 0
+}
+#[cf]
+
+#[of]:awalkl() {
+awalkl() {
+#[of]:  usage
+  if [ $# -ne 2 ] ; then
+    echo "Usage: awalkl {left array} {right array}"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  walks/moves array elements  <---  right to left"
+    echo "Examples:"
+    echo '  i.e.  awalkl nodes args'
+    echo "Returns:"
+    echo "  0 success"
+    echo "  1 if right array is empty"
+    exit 1
+  fi
+#[cf]
+  ashift lc_awalkl_tmp $2 || return $?
+  apush $1 "${lc_awalkl_tmp}"
+  unset lc_awalkl_tmp
+  return 0
+}
+#[cf]
+#[of]:awalkr() {
+awalkr() {
+#[of]:  usage
+  if [ $# -ne 2 ] ; then
+    echo "Usage: awalkr {left array} {right array}"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  walks/moves array elements  --->  left to right"
+    echo "Examples:"
+    echo '  i.e.  awalkr args nodes'
+    echo "Returns:"
+    echo "  0 success"
+    echo "  1 if left array is empty"
+    exit 1
+  fi
+#[cf]
+  apop lc_awalkl_tmp $1 || return $?
+  aunshift $2 "${lc_awalkl_tmp}"
+  unset lc_awalkl_tmp
+  return 0
+}
+#[cf]
+
+
+
 #[of]:array ksh
 if [ -n "${KSH_VERSION}" ] ; then
 #[of]:  aset() {
@@ -218,62 +572,6 @@ elif [ -n "${BASH_VERSION}" ] ; then
 else
 #[of]:  array dash
   if ! type '[[' >/dev/null ; then
-#[of]:    aset() {
-  aset() {
-    local _n _i
-    _n="$1"
-    if [ -z "${_n##*\[*}" ] ; then
-      _n="${1%%\[*}"
-      [ -n "${_n##*_*}" ] && ! isset "${_n}" && eval ${_n}=1
-      _i="${1##${_n}\[}";_i="${_i%%\]*}"
-      eval "${_n}_${_i}=\"\${2}\""
-    else
-      aunset "$1"
-      _n="$1";shift
-      [ -n "${_n##*_*}" ] && ! isset "${_n}" && eval ${_n}=1
-      _i=0
-      while [ $# -gt 0 ] ; do
-        eval "${_n}_${_i}=\"\$1\""
-        shift
-        : $((_i=_i+1))
-      done
-    fi
-  }
-#[cf]
-#[of]:    asize() {
-  asize() {
-    local _i
-    eval "_i=\$(set | while read -r _i;do [ -z \"\${_i##${2}_[[:digit:]]*}\" ] && echo -n 1;done)"
-    _i="${#_i}"
-    if [ "$1" = "-" ] ; then
-      echo "${_i}"
-    else
-      eval "$1=\"\${_i}\""
-    fi
-  }
-#[cf]
-#[of]:    aunset() {
-  aunset() {
-    eval $(eval "set | while read -r _i;do [ -z \"\${_i##$1_*}\" ] && echo \"unset \\\"\${_i%%=*}\\\"\";done")
-    unset $1
-  }
-#[cf]
-#[of]:    akeys() {
-  akeys() {
-    local _i
-    eval "_i=\$(set | while read -r _i;do [ -z \"\${_i##${2}_*}\" ] && _i=\"\${_i%%=*}\" && echo -n \"\${_i##*_} \";done)"
-
-    _i=$(ansort - ${_i})
-
-    if [ "$1" = "-" ] ; then
-      eval "echo \"${_i% }\""
-    else
-      eval "$1=\"\${_i% }\""
-    fi
-  }
-#[c]
-#[c]
-#[cf]
 #[of]:    aget() {
   aget() {
     local _i _n
@@ -286,7 +584,20 @@ else
         eval "$1=\"\${${_n}_${_i}}\""
       fi
     else
-      _i=$(for _i in $(akeys - $2);do echo -n "$(aget - $2[${_i}]) ";done)
+      _i=$(
+        for _i in $(akeys - $2);do
+          _i="$(aget - $2[${_i}])"
+          [ -z "${_i##*\'*}" -a -n "${_i}" ] && {
+            a="";b="${_i}";_i=""
+            while [ -n "${b}" ] ; do
+              a="${b%${b#?}}";b="${b#?}"
+              [ "${a}" = "'" ] && a="'\''"
+              _i="${_i}${a}"
+            done
+          }
+          echo -n "'${_i}' "
+        done
+      )
       if [ "$1" = "-" ] ; then
         eval "echo \"\${_i% }\""
       else
@@ -294,6 +605,23 @@ else
       fi
     fi
   }
+#[c]
+#[cf]
+#[of]:    akeys() {
+  akeys() {
+    local _i
+    eval "_i=\$(set | while read -r _i;do [ -z \"\${_i##${2}_*}\" ] && _i=\"\${_i%%=*}\" && echo -n \"\${_i##*_} \";done)"
+
+    [ -n "${_i}" ] && _i=$(ansort - ${_i})
+
+    if [ "$1" = "-" ] ; then
+      eval "echo \"${_i% }\""
+    else
+      eval "$1=\"\${_i% }\""
+    fi
+  }
+#[c]
+#[c]
 #[cf]
 #[of]:    ansort() {
 ansort() {
@@ -420,6 +748,151 @@ ansort2() {
     eval "${lc_asort_var}=\"\${lc_asort_output}\""
   fi
 }
+#[cf]
+#[of]:    apush() {
+apush() {
+#[of]:  usage
+  if [ $# -eq 0 ] ; then
+    echo "Usage: apush {array} [val val val ...]"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  adds new element/s to the end of an array"
+    echo "  this emulates the perl function unshift"
+    echo "Examples:"
+    echo '  i.e.  apush b "a string"'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  eval "
+    shift
+    aset $1 $(aget - $1) \"\$@\"
+  "
+}
+#[cf]
+#[of]:    apop() {
+apop() {
+#[of]:  usage
+  if [ $# -ne 2 ] ; then
+    echo "Usage: apop {!|-|var} {array}"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  shift an array 1 element right and return that element in var"
+    echo "  this emulates the perl function shift"
+    echo "Examples:"
+    echo '  i.e.  apop b a'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  local _s
+  _s=$(asize - $2)
+  if [ ${_s} -gt 0 ] ; then
+    aget $1 $2[$((_s-1))]
+    aunset $2[$((_s-1))]
+  else
+    return 1
+  fi
+  return 0
+}
+#[cf]
+#[of]:    aunshift() {
+aunshift() {
+#[of]:  usage
+  if [ $# -eq 0 ] ; then
+    echo "Usage: aunshift {array} [val val val ...]"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  adds new element/s to the beginning of an array"
+    echo "  this emulates the perl function unshift"
+    echo "Examples:"
+    echo '  i.e.  aunshift b "a string"'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  eval "
+    shift
+    aset $1 \"\$@\" $(aget - $1)
+  "
+}
+#[cf]
+#[of]:    ashift() {
+ashift() {
+#[of]:  usage
+  if [ $# -ne 2 ] ; then
+    echo "Usage: ashift {!|-|var} {array}"
+    echo "Error: must have at least 2 args"
+    echo "Description:"
+    echo "  shift an array 1 element left and return that element in var"
+    echo "  this emulates the perl function shift"
+    echo "Examples:"
+    echo '  i.e.  ashift b a'
+    echo "Returns:"
+    echo "  0 success"
+    exit 1
+  fi
+#[cf]
+  local _s
+  _s=$(asize - $2)
+  if [ ${_s} -gt 0 ] ; then
+    aget $1 $2[0]
+    aunset $2[0]
+    eval aset $2 $(aget - $2)
+  else
+    return 1
+  fi
+  return 0
+}
+#[cf]
+#[of]:    aset() {
+  aset() {
+    local _n _i
+    _n="$1"
+    if [ -z "${_n##*\[*}" ] ; then
+      _n="${1%%\[*}"
+      [ -n "${_n##*_*}" ] && ! isset "${_n}" && eval ${_n}=1
+      _i="${1##${_n}\[}";_i="${_i%%\]*}"
+      eval "${_n}_${_i}=\"\${2}\""
+    else
+      aunset "$1"
+      _n="$1";shift
+      [ -n "${_n##*_*}" ] && ! isset "${_n}" && eval ${_n}=1
+      _i=0
+      while [ $# -gt 0 ] ; do
+        eval "${_n}_${_i}=\"\$1\""
+        shift
+        : $((_i=_i+1))
+      done
+    fi
+  }
+#[cf]
+#[of]:    asize() {
+  asize() {
+    local _i
+    eval "_i=\$(set | while read -r _i;do [ -z \"\${_i##${2}_[[:digit:]]*}\" ] && echo -n 1;done)"
+    _i="${#_i}"
+    if [ "$1" = "-" ] ; then
+      echo "${_i}"
+    else
+      eval "$1=\"\${_i}\""
+    fi
+  }
+#[cf]
+#[of]:    aunset() {
+  aunset() {
+    if [ -z "${1##*\[*}" ] ; then
+      _n="${1%%\[*}"
+      _i="${1##${_n}\[}";_i="${_i%%\]*}"
+      unset ${_n}_${_i}
+    else
+      eval $(eval "set | while read -r _i;do [ -z \"\${_i##$1_*}\" ] && echo \"unset \\\"\${_i%%=*}\\\"\";done")
+      unset $1
+    fi
+  }
 #[cf]
 #[of]:    isarray() {
   isarray() {
