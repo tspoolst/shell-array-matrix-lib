@@ -609,19 +609,12 @@ else
 #[cf]
 #[of]:    akeys() {
   akeys() {
-    local _i
-    eval "_i=\$(set | while read -r _i;do [ -z \"\${_i##${2}_*}\" ] && _i=\"\${_i%%=*}\" && echo -n \"\${_i##*_} \";done)"
-
-    [ -n "${_i}" ] && _i=$(ansort - ${_i})
-
     if [ "$1" = "-" ] ; then
-      eval "echo \"${_i% }\""
+      eval "echo \"\${$2_keys}\""
     else
-      eval "$1=\"\${_i% }\""
+      eval "$1=\"\${$2_keys}\""
     fi
   }
-#[c]
-#[c]
 #[cf]
 #[of]:    ansort() {
 ansort() {
@@ -850,20 +843,41 @@ ashift() {
 #[cf]
 #[of]:    aset() {
   aset() {
-    local _n _i
+    local _n _i _k1 _k2
     _n="$1"
     if [ -z "${_n##*\[*}" ] ; then
       _n="${1%%\[*}"
       [ -n "${_n##*_*}" ] && ! isset "${_n}" && eval ${_n}=1
       _i="${1##${_n}\[}";_i="${_i%%\]*}"
+#[of]:      process indexes from back
+      isset ${_n}_${_i} || {
+        eval _k1=\" \${${_n}_keys}\"
+        _k2=""
+        while true ; do
+          if [ -n "${_k1# }" ] && [ ${_i} -lt ${_k1##* } ] ; then
+            _k2="${_k1##* }${_k2:+ }${_k2}"
+            _k1="${_k1% *}"
+          else
+            _k1="${_k1# }"
+            eval "${_n}_keys=\"\${_k1}\${_k1:+ }\${_i}\${_k2:+ }\${_k2}\""
+            break
+          fi
+        done
+      }
+#[cf]
       eval "${_n}_${_i}=\"\${2}\""
     else
       aunset "$1"
       _n="$1";shift
       [ -n "${_n##*_*}" ] && ! isset "${_n}" && eval ${_n}=1
+      
       _i=0
+      eval ${_n}_keys=''
       while [ $# -gt 0 ] ; do
-        eval "${_n}_${_i}=\"\$1\""
+        eval "
+          ${_n}_keys=\"\${${_n}_keys}\${${_n}_keys:+ }\${i}\"
+          ${_n}_${_i}=\"\$1\"
+        "
         shift
         : $((_i=_i+1))
       done
@@ -872,25 +886,53 @@ ashift() {
 #[cf]
 #[of]:    asize() {
   asize() {
-    local _i
-    eval "_i=\$(set | while read -r _i;do [ -z \"\${_i##${2}_[[:digit:]]*}\" ] && echo -n 1;done)"
-    _i="${#_i}"
-    if [ "$1" = "-" ] ; then
-      echo "${_i}"
-    else
-      eval "$1=\"\${_i}\""
-    fi
+    eval "
+      set -- \${$2_keys}
+      if [ \"$1\" = \"-\" ] ; then
+        echo \"\$#\"
+      else
+        $1=\"\$#\"
+      fi
+    "
   }
 #[cf]
 #[of]:    aunset() {
   aunset() {
+    local _n _i _k1 _k2
     if [ -z "${1##*\[*}" ] ; then
       _n="${1%%\[*}"
       _i="${1##${_n}\[}";_i="${_i%%\]*}"
+#[of]:      process indexes from front
+#[c]###strange :-/   using DASHs built in string search is slower than going through the trouble of
+#[c]### a string chopping while loop
+#[c]
+#[c]      isset ${_n}_${_i} && {
+#[c]        eval _k1=\" \${${_n}_keys} \"
+#[c]        _k2="${_k1##* ${_i} }"
+#[c]        _k1="${_k1%% ${_i} *}${_k2:+ }${_k2% }"
+#[c]        eval ${_n}_keys=\"\${_k1# }\"
+#[c]      }
+      isset ${_n}_${_i} && {
+        eval _k1=\"\${${_n}_keys} \"
+        _k2=""
+        echo "${_i}"
+        while true ; do
+          if [ -n "${_k1% }" ] && [ ${_i} -ne ${_k1%% *} ] ; then
+            _k2="${_k2}${_k2:+ }${_k1%% *}"
+            _k1="${_k1#* }"
+          else
+            _k1="${_k1#* }"
+            _k1="${_k1% }"
+            eval "${_n}_keys=\"\${_k2}\${_k2:+ }\${_k1}\""
+            break
+          fi
+        done
+      }
+#[cf]
       unset ${_n}_${_i}
     else
-      eval $(eval "set | while read -r _i;do [ -z \"\${_i##$1_*}\" ] && echo \"unset \\\"\${_i%%=*}\\\"\";done")
-      unset $1
+      _k1=$(eval "for _i in \${$1_keys};do echo -n \"\$1_\${_i} \";done")
+      unset $1 $1_keys ${_k1}
     fi
   }
 #[cf]

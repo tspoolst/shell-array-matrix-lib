@@ -89,6 +89,37 @@ aget - a
 
 #[cf]
 
+  aunset a
+  aset a 1 2 '3 3' "4 '4" '5 "5' 6 7 8
+  
+  eval "set -- $(aget - a)"
+  echo $#
+  
+#[c]  set -xv
+  echo --$(aget - b)--
+  apush b 5
+  aunshift b 7
+  apush b 9
+  aget - b
+  
+#[c]  apop - b
+#[c]  ashift - b
+#[c]  aget - b
+  
+  eval ajoin - _ $(aget - a)
+  asplit -e c _ 1_2_3_4_5
+  aget - c
+  
+  echo
+  awalkl d c
+  aget - c
+  aget - d
+  
+  echo
+  awalkr c d
+  aget - c
+  aget - d
+
   exit
 }
 #[cf]
@@ -188,41 +219,25 @@ matrixTest() {
 #[c]arrayTest
 #[c]matrixTest
 
-#[c]i=0
-#[c]while [ $i -lt 100 ] ; do
-#[c]  aset a[${i}] v$i
-#[c]  : $((i=i+1))
-#[c]done
-#[c]akeys - a
+i=0
+while [ $i -lt 10000 ] ; do
+  aset a[${i}] v$i
+  : $((i=i+1))
+done
+i=1000
+while [ $i -lt 2000 ] ; do
+echo $i
+  aunset a[${i}]
+  : $((i=i+1))
+done
 
+aset a[150] v150
+
+asize - a
+akeys - a
+aget - a
+echo ----
 aunset a
-aset a 1 2 '3 3' "4 '4" '5 "5' 6 7 8
-
-eval "set -- $(aget - a)"
-echo $#
-
-#[c]set -xv
-echo --$(aget - b)--
-apush b 5
-aunshift b 7
-apush b 9
-aget - b
-
-#[c]apop - b
-#[c]ashift - b
-#[c]aget - b
-
-eval ajoin - _ $(aget - a)
-asplit -e c _ 1_2_3_4_5
-aget - c
-
-echo
-awalkl d c
-aget - c
-aget - d
-
-echo
-awalkr c d
-aget - c
-aget - d
+set | grep ^a
+echo ----
 
