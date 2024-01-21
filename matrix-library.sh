@@ -1026,6 +1026,14 @@ mstep() {
   unset _dm _v _a _ar _i _s
   local _dm _v _a _ar _i _s
   
+  local _indexFlag
+  _indexFlag=false
+
+  [ "$1" = "-i" ] && {
+    _indexFlag=true
+    shift
+  }
+  
   ! isnum "$2" && { _v="$1";shift; }
   _a="$1"
   _ar="$1"
@@ -1062,7 +1070,7 @@ mstep() {
     eval ${_a}_index=0
   fi
 
-  if [ ${_dm} -eq 1 ] ; then
+  if [ ${_dm} -eq 1 ] && ! ${_indexFlag} ; then
     isset "_v" && eval aget \"\${_v}\" \"${_a}[\${${_a}_index:-0}]\"
   else
     if [ "${_v}" = "-" ] ; then
@@ -1103,6 +1111,14 @@ mcurrent() {
   unset _dm _v _a
   local _dm _v _a
   
+  local _indexFlag
+  _indexFlag=false
+
+  [ "$1" = "-i" ] && {
+    _indexFlag=true
+    shift
+  }
+  
   _v="$1"
   shift
   _a="$1"
@@ -1118,7 +1134,7 @@ mcurrent() {
   done
 
   if isset "${_a}_index" ; then
-    if [ ${_dm} -eq 1 ] ; then
+    if [ ${_dm} -eq 1 ] && ! ${_indexFlag} ; then
       eval aget \"\${_v}\" \"\${_a}[\${${_a}_index}]\"
     else
       if [ "${_v}" = "-" ] ; then

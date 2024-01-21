@@ -266,7 +266,7 @@ set | grep ^fbControlsList
 while mstep i fbControlsList ; do
   while mstep b fbControlsList ${i} ; do
   msize - fbControlsList
-    echo new button fb${b} ${gl_fbControlWidth} a b
+    echo new button fb${b} ${gl_fbControlWidth} a b $(mcurrent -i - fbControlsList ${i})
   done
 done
 
