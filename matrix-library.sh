@@ -998,7 +998,7 @@ msize() {
     _in=$( set | (
         _j=0;_k=""
         while read -r _i;do
-          [ -z "${_i##${_an}_*}" ] && {
+          [ -z "${_i##${_an}_[[:digit:]]*}" ] && {
             _i="${_i%%[\[=]*}"
             _i="${_i#${_an}_}"
             _i="${_i%%_*}"
@@ -1022,35 +1022,55 @@ msize() {
 #[of]:mstep() {
 mstep() {
   #force local vars to be defined as unset without affecting parent vars in ksh/bash/dash
-  local _dm _v _a _i _s
-  unset _dm _v _a _i _s
-  local _dm _v _a _i _s
+  local _dm _v _a _ar _i _s
+  unset _dm _v _a _ar _i _s
+  local _dm _v _a _ar _i _s
   
   ! isnum "$2" && { _v="$1";shift; }
   _a="$1"
+  _ar="$1"
   isset "${_a}" || return 1
   isaheader "${_a}" && eval _dm=\"\${${_a}:-1}\" || _dm=1
 
   shift
   while [ ${_dm} -gt 1 ] ; do
-    [ $# -eq 0 ] && { echo "not enough args for this matrix/array" >&2;return 1; }
+    [ $# -eq 0 ] && break
     _a="${_a}_$1"
+    _ar="${_ar} $1"
     : $((_dm=_dm-1))
     shift
   done
   _s="$1"
 
-  ! isset "${_a}_size" && asize ${_a}_size "${_a}"
+  if [ ${_dm} -eq 1 ] ; then
+    ! isset "${_a}_size" && asize ${_a}_size "${_a}"
+  else
+    ! isset "${_a}_size" && msize ${_a}_size ${_ar}
+  fi
+
   if isset "${_a}_index" ; then
     eval ": \$((${_a}_index=\${${_a}_index:-0}+${_s:-1}))"
     if eval "[ \${${_a}_index} -lt 0 -o \${${_a}_index} -ge \${${_a}_size} ]" ; then
-      areset "${_a}"
+      if [ ${_dm} -eq 1 ] ; then
+        areset "${_a}"
+      else
+        mreset "${_a}"
+      fi
       return 1
     fi
   else
     eval ${_a}_index=0
   fi
-  isset "_v" && eval aget \"\${_v}\" \"${_a}[\${${_a}_index:-0}]\"
+
+  if [ ${_dm} -eq 1 ] ; then
+    isset "_v" && eval aget \"\${_v}\" \"${_a}[\${${_a}_index:-0}]\"
+  else
+    if [ "${_v}" = "-" ] ; then
+      eval echo \"\${${_a}_index:-0}\"
+    else
+      eval "${_v}=\"\${${_a}_index:-0}\""
+    fi
+  fi
 }
 #[cf]
 #[of]:mreset() {
@@ -1066,7 +1086,7 @@ mreset() {
   
   shift
   while [ ${_dm} -gt 1 ] ; do
-    [ $# -eq 0 ] && { echo "not enough args for this matrix/array" >&2;return 1; }
+    [ $# -eq 0 ] && break
     _a="${_a}_$1"
     : $((_dm=_dm-1))
     shift
@@ -1091,14 +1111,22 @@ mcurrent() {
   
   shift
   while [ ${_dm} -gt 1 ] ; do
-    [ $# -eq 0 ] && { echo "not enough args for this matrix/array" >&2;return 1; }
+    [ $# -eq 0 ] && break
     _a="${_a}_$1"
     : $((_dm=_dm-1))
     shift
   done
 
   if isset "${_a}_index" ; then
-    eval aget \"\${_v}\" \"\${_a}[\${${_a}_index}]\"
+    if [ ${_dm} -eq 1 ] ; then
+      eval aget \"\${_v}\" \"\${_a}[\${${_a}_index}]\"
+    else
+      if [ "${_v}" = "-" ] ; then
+        eval echo \"\${${_a}_index:-0}\"
+      else
+        eval "${_v}=\"\${${_a}_index:-0}\""
+      fi
+    fi
   else
     return 1
   fi
@@ -1111,7 +1139,50 @@ if [ -n "${KSH_VERSION}" ] ; then
 #[cf]
 #[of]:matrix bash
 elif [ -n "${BASH_VERSION}" ] ; then
-  :
+#[of]:  msize() {
+msize() {
+  local _v _an _dm _in
+  _v="$1";shift
+  _an="$1";shift
+
+  if ! isset "${_an}" ; then
+    _dm=1
+  else
+    eval "_dm=\"\${${_an}}\""
+  fi
+
+  _in="${_dm}"
+  [ $# -gt $((_in-1)) ] && { echo "matrix is not that big" >&2;return 1; }
+  while [ ${_in} -gt 1 ] ; do
+    [ $# -gt 0 ] && { _an="${_an}_$1";shift; } || break
+    : $((_in=_in-1))
+  done
+
+  [ ${_in} -eq 1 ] && asize ${_v} "${_an}"
+  [ ${_in} -gt 1 ] && {
+    _in=$(
+      eval "_i=( \${!${_an}*} )"
+      _j=0;k=""
+      for _i in "${_i[@]}" ; do
+        [ -z "${_i##*_[[:digit:]]*}" ] && {
+          _i="${_i#${_an}_}"
+          _i="${_i%%_*}"
+          [ ${_j} -eq 0 ] && { _k="${_i}";: $((_j=_j+1));continue; }
+          [ "${_k}" != "${_i}" ] && { _k="${_i}";: $((_j=_j+1)); }
+        }
+      done
+      echo ${_j}
+    )
+    if [ "${_v}" = "-" ] ; then
+      eval "echo \"${_in% }\""
+    else
+      eval "${_v}=\"\${_in% }\""
+    fi
+  }
+
+  return
+}
+#[cf]
 #[cf]
 else
 #[of]:  matrix dash

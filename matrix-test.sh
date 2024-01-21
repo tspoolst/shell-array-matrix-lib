@@ -195,34 +195,78 @@ matrixTest() {
 #[c]done
 #[c]akeys - a
 
-aunset a
-aset a 1 2 '3 3' "4 '4" '5 "5' 6 7 8
-
-eval "set -- $(aget - a)"
-echo $#
-
+#[c]aunset a
+#[c]aset a 1 2 '3 3' "4 '4" '5 "5' 6 7 8
+#[c]
+#[c]eval "set -- $(aget - a)"
+#[c]echo $#
+#[c]
 #[c]set -xv
-echo --$(aget - b)--
-apush b 5
-aunshift b 7
-apush b 9
-aget - b
-
+#[c]echo --$(aget - b)--
+#[c]apush b 5
+#[c]aunshift b 7
+#[c]apush b 9
+#[c]aget - b
+#[c]
 #[c]apop - b
 #[c]ashift - b
 #[c]aget - b
+#[c]
+#[c]eval ajoin - _ $(aget - a)
+#[c]asplit -e c _ 1_2_3_4_5
+#[c]aget - c
+#[c]
+#[c]echo
+#[c]awalkl d c
+#[c]aget - c
+#[c]aget - d
+#[c]
+#[c]echo
+#[c]awalkr c d
+#[c]aget - c
+#[c]aget - d
 
-eval ajoin - _ $(aget - a)
-asplit -e c _ 1_2_3_4_5
-aget - c
 
-echo
-awalkl d c
-aget - c
-aget - d
+#[c]mset fbControlsList 2 0 _ Shuffle VolumeDown VolumeUp
+#[c]mset fbControlsList 2 1 _ PageUp1 Up1 PageDown1
+#[c]mset fbControlsList 2 2 _ PageUp2 Up2 PageDown2
+#[c]mset fbControlsList 2 3 _ Back Down Enter
+#[c]msize - fbControlsList 2 0
 
-echo
-awalkr c d
-aget - c
-aget - d
+#[c]set -xv
+#[c]while mstep - fbControlsList ; do :; done
+
+#[c]mstep - fbControlsList
+#[c]mstep - fbControlsList
+#[c]mreset fbControlsList
+#[c]mstep - fbControlsList
+#[c]mstep - fbControlsList
+#[c]mcurrent - fbControlsList
+#[c]mstep - fbControlsList
+#[c]mcurrent - fbControlsList
+
+set | grep ^fbC
+#[c]echo
+#[c]set -xv
+#[c]mstep - fbControlsList 0 && echo yes || echo no
+#[c]mstep - fbControlsList 0 && echo yes || echo no
+#[c]mcurrent - fbControlsList 0
+#[c]mcurrent - fbControlsList 0
+#[c]mstep - fbControlsList 0 && echo yes || echo no
+#[c]mstep - fbControlsList 0 && echo yes || echo no
+#[c]mstep - fbControlsList 0 && echo yes || echo no
+#[c]exit
+
+mset fbControlsList 2 0 _ Back Down Enter
+mset fbControlsList 2 1 _ PageUp Up PageDown
+mset fbControlsList 2 2 _ Blank VolumeDown VolumeUp
+
+set | grep ^fbControlsList
+
+while mstep i fbControlsList ; do
+  while mstep b fbControlsList ${i} ; do
+  msize - fbControlsList
+    echo new button fb${b} ${gl_fbControlWidth} a b
+  done
+done
 
